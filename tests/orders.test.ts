@@ -16,7 +16,8 @@ afterAll(async () => {
 
 const order = { reference: "starter-pack.abc123", productId: "starter-pack", amountKobo: 500_000 }
 
-describe("Postgres store", () => {
+// Starting the Postgres engine (WebAssembly) can take several seconds on a busy machine or CI runner.
+describe("Postgres store", { timeout: 30_000 }, () => {
   it("creates its own table and fulfils a reference once", async () => {
     const store = postgresStore(await freshDatabase())
     expect(await store.claim(order)).toBe(true)
