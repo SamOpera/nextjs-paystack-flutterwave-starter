@@ -15,9 +15,9 @@ Most payment tutorials trust the redirect: Paystack or Flutterwave sends the sho
 - **Server-side verification.** After checkout, the app calls the provider's verify API and checks four things: the payment succeeded, the reference is ours, the currency is NGN, and the amount is at least the full price ([`lib/verify.ts`](lib/verify.ts)).
 - **Webhooks with signature checks.** Paystack webhooks are checked with HMAC SHA-512 of the raw body; Flutterwave webhooks with your secret hash. Both use constant-time comparison ([`lib/signature.ts`](lib/signature.ts)). Even a signed webhook is re-verified with the API before fulfilling.
 - **Fulfil once.** The redirect and the webhook can both arrive, more than once. Orders are fulfilled once per reference ([`lib/orders.ts`](lib/orders.ts)).
-- **Provider outages handled.** If the provider can't be reached, the shopper sees "Still confirming" and the webhook asks the provider to retry.
+- **Provider outages and rate limits handled.** If the verify API is down or answers 429, that is never read as a failed payment: the shopper sees "Still confirming", and the webhook answers 503 so the provider sends the event again later.
 - **No secrets in the browser.** Keys are server-only environment variables, never `NEXT_PUBLIC_`.
-- **16 tests** covering verification, underpayment, wrong currency, forged references, webhook signatures and double fulfilment, with no real network calls.
+- **21 tests** covering verification, rate limits, underpayment, wrong currency, forged references, webhook signatures and double fulfilment, with no real network calls.
 
 ## Run it in 5 minutes
 

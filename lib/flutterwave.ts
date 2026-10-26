@@ -3,7 +3,7 @@
 
 import { CURRENCY, type Product } from "./catalog"
 import { productIdFromReference } from "./env"
-import type { PaymentFacts } from "./verify"
+import { assertAnswered, type PaymentFacts } from "./verify"
 
 const API = "https://api.flutterwave.com/v3"
 
@@ -48,6 +48,7 @@ export async function verifyFlutterwavePayment(
     `${API}/transactions/verify_by_reference?tx_ref=${encodeURIComponent(reference)}`,
     { headers: { authorization: `Bearer ${secretKey}` }, cache: "no-store" }
   )
+  assertAnswered(response)
   const json = await response.json().catch(() => null)
   const data = json?.data
   return {

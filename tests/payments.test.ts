@@ -7,17 +7,17 @@ import { startFlutterwavePayment, verifyFlutterwavePayment } from "../lib/flutte
 import { fulfilOnce, resetOrders } from "../lib/orders"
 import { startPaystackPayment, verifyPaystackPayment } from "../lib/paystack"
 import { isValidFlutterwaveHash, isValidPaystackSignature } from "../lib/signature"
-import { checkPayment } from "../lib/verify"
+import { VerifyUnavailable, checkPayment } from "../lib/verify"
 
 const starter = PRODUCTS[0]
 const reference = newReference(starter.id)
 
 /** A fake fetch that records the request and answers with the given JSON. */
-const fakeFetch = (body: unknown, ok = true) => {
+const fakeFetch = (body: unknown, ok = true, status = ok ? 200 : 400) => {
   const calls: { url: string; init?: RequestInit }[] = []
   const fetcher = (async (url: string, init?: RequestInit) => {
     calls.push({ url, init })
-    return { ok, json: async () => body } as Response
+    return { ok, status, json: async () => body } as Response
   }) as unknown as typeof fetch
   return { fetcher, calls }
 }
@@ -150,6 +150,19 @@ describe("Flutterwave", () => {
     expect(isValidFlutterwaveHash("my-secret-hash", "my-secret-hash")).toBe(true)
     expect(isValidFlutterwaveHash("guess", "my-secret-hash")).toBe(false)
     expect(isValidFlutterwaveHash(null, "my-secret-hash")).toBe(false)
+  })
+})
+
+describe("when the verify API can't answer", () => {
+  it.each([429, 500, 503])("HTTP %i means try again later, not a failed payment", async (status) => {
+    const busy = fakeFetch({ message: "Too many requests" }, false, status)
+    await expect(verifyPaystackPayment(reference, "sk", busy.fetcher)).rejects.toBeInstanceOf(VerifyUnavailable)
+    await expect(verifyFlutterwavePayment(reference, "k", busy.fetcher)).rejects.toBeInstanceOf(VerifyUnavailable)
+  })
+
+  it("still treats a real 'not found' answer as not paid", async () => {
+    const { fetcher } = fakeFetch({ status: false, message: "Transaction reference not found" }, false, 404)
+    expect(checkPayment(await verifyPaystackPayment(reference, "sk", fetcher)).ok).toBe(false)
   })
 })
 

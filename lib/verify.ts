@@ -37,3 +37,19 @@ export function checkPayment(facts: PaymentFacts): Verdict {
 
   return { ok: true, reference, productId: product.id, amountKobo: facts.amountKobo }
 }
+
+/**
+ * The provider couldn't answer right now (rate limited or down). This is not a failed
+ * payment: callers must not mark the order failed, and a webhook should answer non-200
+ * so the provider sends the event again later.
+ */
+export class VerifyUnavailable extends Error {
+  constructor(public status: number) {
+    super(`Verify API unavailable (HTTP ${status})`)
+  }
+}
+
+/** 429 and 5xx mean "ask again later". Other answers are a real verdict. */
+export function assertAnswered(response: Response) {
+  if (response.status === 429 || response.status >= 500) throw new VerifyUnavailable(response.status)
+}

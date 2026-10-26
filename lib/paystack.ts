@@ -3,7 +3,7 @@
 
 import { CURRENCY, type Product } from "./catalog"
 import { productIdFromReference } from "./env"
-import type { PaymentFacts } from "./verify"
+import { assertAnswered, type PaymentFacts } from "./verify"
 
 const API = "https://api.paystack.co"
 
@@ -44,6 +44,7 @@ export async function verifyPaystackPayment(
     `${API}/transaction/verify/${encodeURIComponent(reference)}`,
     { headers: { authorization: `Bearer ${secretKey}` }, cache: "no-store" }
   )
+  assertAnswered(response)
   const json = await response.json().catch(() => null)
   const data = json?.data
   return {
