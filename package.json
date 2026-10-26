@@ -1,0 +1,27 @@
+{
+  "name": "nextjs-paystack-flutterwave-starter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Next.js starter for taking payments in Nigeria with Paystack or Flutterwave, verified on the server.",
+  "license": "MIT",
+  "author": "Samson Olakeye (https://samsonolakeye.com)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "next": "16.4.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
