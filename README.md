@@ -14,10 +14,11 @@ Most payment tutorials trust the redirect: Paystack or Flutterwave sends the sho
 - **Server-side prices.** The browser sends a product id, never an amount. Prices live in [`lib/catalog.ts`](lib/catalog.ts), in kobo.
 - **Server-side verification.** After checkout, the app calls the provider's verify API and checks four things: the payment succeeded, the reference is ours, the currency is NGN, and the amount is at least the full price ([`lib/verify.ts`](lib/verify.ts)).
 - **Webhooks with signature checks.** Paystack webhooks are checked with HMAC SHA-512 of the raw body; Flutterwave webhooks with your secret hash. Both use constant-time comparison ([`lib/signature.ts`](lib/signature.ts)). Even a signed webhook is re-verified with the API before fulfilling.
-- **Fulfil once.** The redirect and the webhook can both arrive, more than once. Orders are fulfilled once per reference ([`lib/orders.ts`](lib/orders.ts)).
+- **Fulfil once, even on serverless.** The redirect and the webhook can both arrive, more than once, on different server instances. With `DATABASE_URL` set, orders are recorded in Postgres with the reference as the primary key, so exactly one fulfilment wins ([`lib/orders.ts`](lib/orders.ts)).
+- **Unsafe setups refuse to run.** Without a database, orders are kept in memory, which is fine locally and for test-mode demos. With live keys in production and no `DATABASE_URL`, the starter won't fulfil orders rather than risk fulfilling one twice.
 - **Provider outages and rate limits handled.** If the verify API is down or answers 429, that is never read as a failed payment: the shopper sees "Still confirming", and the webhook answers 503 so the provider sends the event again later.
 - **No secrets in the browser.** Keys are server-only environment variables, never `NEXT_PUBLIC_`.
-- **21 tests** covering verification, rate limits, underpayment, wrong currency, forged references, webhook signatures and double fulfilment, with no real network calls.
+- **28 tests** covering verification, rate limits, underpayment, wrong currency, forged references, webhook signatures, and double fulfilment, including three server instances racing on a real Postgres engine. No real network calls.
 
 ## Run it in 5 minutes
 
@@ -58,7 +59,7 @@ Webhooks confirm a payment even if the shopper closes the tab before the redirec
 ## Deploy on Vercel
 
 1. Import the repo on [vercel.com/new](https://vercel.com/new).
-2. Add the environment variables from `.env.example`, with `SITE_URL` set to your Vercel URL.
+2. Add the environment variables from `.env.example`, with `SITE_URL` set to your Vercel URL. For live payments, add `DATABASE_URL` too (see below).
 3. Deploy, then add the webhook URLs above in each dashboard.
 
 ## How a payment flows
@@ -80,7 +81,8 @@ Browser                 Your server                       Provider
 
 ## Going to production
 
-- **Replace the in-memory order store** in [`lib/orders.ts`](lib/orders.ts) with your database, and make the reference a unique key so a payment can never be fulfilled twice.
+- **Set `DATABASE_URL`** to any Postgres database, for example Supabase (use the transaction pooler URL), Neon or Vercel Postgres. The `fulfilled_orders` table is created on first use. This is required with live keys: without it, orders are not fulfilled and the reason is logged.
+- **Deliver the goods where `fulfilOnce` returns true** in [`lib/orders.ts`](lib/orders.ts). That branch runs exactly once per payment.
 - **Treat `/result` as a message, not proof.** It only displays what the server decided. Use your database as the record of what was paid.
 - **Switch to live keys** in your host's environment variables only, and set the live webhook URLs.
 - **Keep the amount check.** If you add discounts or a cart, calculate the total on the server and store it with the reference, then compare against that.
