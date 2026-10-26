@@ -4,6 +4,8 @@ Take payments in Nigeria with **Paystack** or **Flutterwave** in a Next.js app, 
 
 Most payment tutorials trust the redirect: Paystack or Flutterwave sends the shopper back with `?status=successful`, and the app marks the order paid. Anyone can type that URL. This starter never trusts the browser.
 
+**Live demo (test mode):** [https://nextjs-paystack-flutterwave-starter.vercel.app](https://nextjs-paystack-flutterwave-starter.vercel.app). Pay with each provider's test card; no real money moves.
+
 ![Checkout page](docs/checkout.png)
 
 ## What's inside
