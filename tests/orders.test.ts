@@ -1,7 +1,7 @@
 import { PGlite } from "@electric-sql/pglite"
 import { afterAll, describe, expect, it } from "vitest"
 
-import { NoDatabaseError, memoryStore, postgresStore, storeFromEnv, usesLiveKeys, type Query } from "../lib/orders"
+import { NoDatabaseError, SCHEMA, memoryStore, postgresStore, storeFromEnv, usesLiveKeys, type Query } from "../lib/orders"
 
 // A real Postgres engine, in process. Each test gets its own database.
 const databases: PGlite[] = []
@@ -31,6 +31,26 @@ describe("Postgres store", { timeout: 30_000 }, () => {
     const instances = [postgresStore(query), postgresStore(query), postgresStore(query)]
     const results = await Promise.all(instances.flatMap((s) => [s.claim(order), s.claim(order)]))
     expect(results.filter(Boolean)).toHaveLength(1)
+  })
+
+  it.each(["23505", "42710", "42P07"])(
+    "treats losing the create-table race (%s) as 'table exists', not as a failure",
+    async (code) => {
+      const real = await freshDatabase()
+      await real(SCHEMA, []) // another instance won the race and created it
+      const losing: Query = async (text, params) => {
+        if (text === SCHEMA) throw Object.assign(new Error("lost the race"), { code })
+        return real(text, params)
+      }
+      expect(await postgresStore(losing).claim(order)).toBe(true)
+    }
+  )
+
+  it("still reports a real database failure, so the webhook is retried", async () => {
+    const down: Query = async () => {
+      throw Object.assign(new Error("connection refused"), { code: "ECONNREFUSED" })
+    }
+    await expect(postgresStore(down).claim(order)).rejects.toThrow("connection refused")
   })
 
   it("records what was fulfilled", async () => {

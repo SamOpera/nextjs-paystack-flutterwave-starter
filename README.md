@@ -18,7 +18,7 @@ Most payment tutorials trust the redirect: Paystack or Flutterwave sends the sho
 - **Unsafe setups refuse to run.** Without a database, orders are kept in memory, which is fine locally and for test-mode demos. With live keys in production and no `DATABASE_URL`, the starter won't fulfil orders rather than risk fulfilling one twice.
 - **Provider outages and rate limits handled.** If the verify API is down or answers 429, that is never read as a failed payment: the shopper sees "Still confirming", and the webhook answers 503 so the provider sends the event again later.
 - **No secrets in the browser.** Keys are server-only environment variables, never `NEXT_PUBLIC_`.
-- **28 tests** covering verification, rate limits, underpayment, wrong currency, forged references, webhook signatures, and double fulfilment, including three server instances racing on a real Postgres engine. No real network calls.
+- **32 tests** covering verification, rate limits, underpayment, wrong currency, forged references, webhook signatures, and double fulfilment, including three server instances racing on a real Postgres engine. No real network calls.
 
 ## Run it in 5 minutes
 

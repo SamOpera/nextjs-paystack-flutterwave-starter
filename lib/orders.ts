@@ -47,7 +47,12 @@ export function postgresStore(query: Query): OrderStore {
   return {
     async claim(order) {
       ready ??= query(SCHEMA, []).catch((error) => {
-        ready = null // let the next call try again
+        // Several instances creating the table at the same moment: Postgres lets one
+        // win and rejects the rest with a duplicate key on its own catalog (23505),
+        // "type already exists" (42710) or "table already exists" (42P07). Either way
+        // the table, and its key, now exist.
+        if (isAlreadyCreated(error)) return
+        ready = null // a real failure: let the next call try again
         throw error
       })
       await ready
@@ -63,6 +68,11 @@ export function postgresStore(query: Query): OrderStore {
       return rows.length === 1
     },
   }
+}
+
+function isAlreadyCreated(error: unknown): boolean {
+  const code = (error as { code?: unknown })?.code
+  return code === "23505" || code === "42710" || code === "42P07"
 }
 
 /** Test keys can't move real money, so memory is acceptable for a test-mode demo. */
@@ -87,7 +97,8 @@ export async function storeFromEnv(env: Record<string, string | undefined> = pro
   if (env.DATABASE_URL) {
     const { default: postgres } = await import("postgres")
     // prepare: false keeps it working behind transaction poolers such as Supabase's.
-    const sql = postgres(env.DATABASE_URL, { max: 1, prepare: false })
+    // onnotice: silence "already exists, skipping" from the create-if-not-exists.
+    const sql = postgres(env.DATABASE_URL, { max: 1, prepare: false, onnotice: () => {} })
     return postgresStore(async (text, params) => ({
       rows: await sql.unsafe(text, params as never[]),
     }))
