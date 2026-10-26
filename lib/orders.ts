@@ -14,6 +14,9 @@ const fulfilled = new Map<string, Fulfilled>()
 
 /** Returns true the first time a reference is fulfilled, false on every repeat. */
 export async function fulfilOnce(verdict: Extract<Verdict, { ok: true }>): Promise<boolean> {
+  // The check and the write happen with no await in between, so within one server
+  // process a racing callback and webhook can't both pass. Across several instances
+  // only a database unique key gives the same guarantee (see the note above).
   if (fulfilled.has(verdict.reference)) return false
   fulfilled.set(verdict.reference, {
     reference: verdict.reference,

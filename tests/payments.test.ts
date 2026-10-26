@@ -161,4 +161,11 @@ describe("fulfilment", () => {
     expect(await fulfilOnce(verdict)).toBe(true)
     expect(await fulfilOnce(verdict)).toBe(false)
   })
+
+  it("fulfils once when the callback and webhook confirm the same payment at the same moment", async () => {
+    // Both paths verify the payment, then race to fulfil it.
+    const verdict = { ok: true as const, reference, productId: starter.id, amountKobo: starter.priceKobo }
+    const results = await Promise.all([fulfilOnce(verdict), fulfilOnce(verdict), fulfilOnce(verdict)])
+    expect(results.filter(Boolean)).toHaveLength(1)
+  })
 })
