@@ -17,8 +17,9 @@ Most payment tutorials trust the redirect: Paystack or Flutterwave sends the sho
 - **Fulfil once, even on serverless.** The redirect and the webhook can both arrive, more than once, on different server instances. With `DATABASE_URL` set, orders are recorded in Postgres with the reference as the primary key, so exactly one fulfilment wins ([`lib/orders.ts`](lib/orders.ts)).
 - **Unsafe setups refuse to run.** Without a database, orders are kept in memory, which is fine locally and for test-mode demos. With live keys in production and no `DATABASE_URL`, the starter won't fulfil orders rather than risk fulfilling one twice.
 - **Provider outages and rate limits handled.** If the verify API is down or answers 429, that is never read as a failed payment: the shopper sees "Still confirming", and the webhook answers 503 so the provider sends the event again later.
+- **A reconciler for long outages.** Every payment is recorded as pending before the shopper pays. A scheduled job ([`lib/reconcile.ts`](lib/reconcile.ts)) re-verifies anything paid but never fulfilled, through the same `settle()` path, so an order can't be lost even if the provider stays down longer than its webhook retries. It backs off from a provider that is still down and gives up on checkouts abandoned for 3 days.
 - **No secrets in the browser.** Keys are server-only environment variables, never `NEXT_PUBLIC_`.
-- **32 tests** covering verification, rate limits, underpayment, wrong currency, forged references, webhook signatures, and double fulfilment, including three server instances racing on a real Postgres engine. No real network calls.
+- **45 tests** covering verification, rate limits, underpayment, wrong currency, forged references, webhook signatures, double fulfilment and reconciliation, including server instances racing on a real Postgres engine. No real network calls.
 
 ## Run it in 5 minutes
 
@@ -61,6 +62,7 @@ Webhooks confirm a payment even if the shopper closes the tab before the redirec
 1. Import the repo on [vercel.com/new](https://vercel.com/new).
 2. Add the environment variables from `.env.example`, with `SITE_URL` set to your Vercel URL. For live payments, add `DATABASE_URL` too (see below).
 3. Deploy, then add the webhook URLs above in each dashboard.
+4. Add a `CRON_SECRET` (a random string of 16+ characters). Vercel sends it to `/api/reconcile`, and the route refuses every other caller. `vercel.json` runs the reconciler once a day, the most often the Hobby plan allows; on Pro, change the schedule to `*/10 * * * *`.
 
 ## How a payment flows
 
@@ -81,7 +83,7 @@ Browser                 Your server                       Provider
 
 ## Going to production
 
-- **Set `DATABASE_URL`** to any Postgres database, for example Supabase (use the transaction pooler URL), Neon or Vercel Postgres. The `fulfilled_orders` table is created on first use. This is required with live keys: without it, orders are not fulfilled and the reason is logged.
+- **Set `DATABASE_URL`** to any Postgres database, for example Supabase (use the transaction pooler URL), Neon or Vercel Postgres. The `fulfilled_orders` and `pending_payments` tables are created on first use. This is required with live keys: without it, checkout refuses to start payments and the reason is logged.
 - **Deliver the goods where `fulfilOnce` returns true** in [`lib/orders.ts`](lib/orders.ts). That branch runs exactly once per payment.
 - **Treat `/result` as a message, not proof.** It only displays what the server decided. Use your database as the record of what was paid.
 - **Switch to live keys** in your host's environment variables only, and set the live webhook URLs.

@@ -4,6 +4,7 @@
 import { findProduct } from "@/lib/catalog"
 import { newReference, requireEnv, siteUrl } from "@/lib/env"
 import { startFlutterwavePayment } from "@/lib/flutterwave"
+import { orderStore } from "@/lib/orders"
 import { startPaystackPayment } from "@/lib/paystack"
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -25,6 +26,11 @@ export async function POST(request: Request) {
 
   const reference = newReference(product.id)
   try {
+    // Recorded before the shopper pays, so the reconciler can find this payment later
+    // even if every redirect and webhook for it is lost.
+    const store = await orderStore()
+    await store.recordPending({ reference, provider, productId: product.id, amountKobo: product.priceKobo }, Date.now())
+
     const url =
       provider === "paystack"
         ? await startPaystackPayment(

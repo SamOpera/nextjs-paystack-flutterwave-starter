@@ -7,7 +7,7 @@ const COPY = {
   },
   pending: {
     title: "Still confirming",
-    text: "We couldn't reach the payment provider to confirm this yet. If the payment went through, it will be confirmed automatically in a few minutes. Keep the reference below.",
+    text: "We couldn't reach the payment provider to confirm this yet. If the payment went through, it will be confirmed automatically: the webhook retries, and a scheduled check picks up anything still waiting. Keep the reference below.",
   },
   failed: {
     title: "Payment not confirmed",

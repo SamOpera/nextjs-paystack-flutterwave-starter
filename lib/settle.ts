@@ -3,11 +3,11 @@
 
 import { requireEnv } from "./env"
 import { verifyFlutterwavePayment } from "./flutterwave"
-import { fulfilOnce } from "./orders"
+import { fulfilOnce, type Provider } from "./orders"
 import { verifyPaystackPayment } from "./paystack"
 import { checkPayment, type Verdict } from "./verify"
 
-export type Provider = "paystack" | "flutterwave"
+export type { Provider }
 
 export async function settle(provider: Provider, reference: string): Promise<Verdict> {
   const facts =
