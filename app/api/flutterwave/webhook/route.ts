@@ -19,9 +19,9 @@ export async function POST(request: Request) {
       const verdict = await settle("flutterwave", reference)
       if (!verdict.ok) console.warn(`Flutterwave ${reference} not fulfilled: ${verdict.reason}`)
     } catch (error) {
-      // Could not verify right now. A non-200 answer makes Flutterwave retry later.
+      // Could not verify or deliver right now. A non-200 answer makes Flutterwave retry later.
       console.error(error)
-      return new Response("Verification unavailable", { status: 503 })
+      return new Response("Could not settle this payment yet", { status: 503 })
     }
   }
   return new Response("ok")

@@ -2,7 +2,7 @@ import { PGlite } from "@electric-sql/pglite"
 import { afterAll, describe, expect, it } from "vitest"
 
 import { isCronAuthorized } from "../lib/cronAuth"
-import { memoryStore, postgresStore, type OrderStore, type Pending, type Provider } from "../lib/orders"
+import { fulfilOnce, memoryStore, postgresStore, type OrderStore, type Pending, type Provider } from "../lib/orders"
 import { reconcile } from "../lib/reconcile"
 import { VerifyUnavailable, type Verdict } from "../lib/verify"
 
@@ -22,8 +22,9 @@ function provider(store: OrderStore, paid: string[], down: Provider[] = []) {
     calls.push(reference)
     if (down.includes(p)) throw new VerifyUnavailable(503)
     if (!paid.includes(reference)) return { ok: false, reference, reason: "not successful" }
-    await store.claim({ reference, productId: "starter-pack", amountKobo: 150_000 })
-    return { ok: true, reference, productId: "starter-pack", amountKobo: 150_000 }
+    const verdict = { ok: true as const, reference, productId: "starter-pack", amountKobo: 150_000 }
+    await fulfilOnce(verdict, { store, deliver: async () => {} })
+    return verdict
   }
   return { settle, calls }
 }
@@ -59,6 +60,7 @@ describe.each(stores)("reconciler on the %s store", { timeout: 30_000 }, (_, mak
     const store = await makeStore()
     await store.recordPending(payment("a"), T0)
     await store.claim({ reference: "a", productId: "starter-pack", amountKobo: 150_000 })
+    await store.markDelivered("a")
     const { settle, calls } = provider(store, ["a"])
     await reconcile({ store, settle, now: T0 + 15 * MIN })
     expect(calls).toEqual([])

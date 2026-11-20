@@ -27,9 +27,9 @@ export async function POST(request: Request) {
       const verdict = await settle("paystack", reference)
       if (!verdict.ok) console.warn(`Paystack ${reference} not fulfilled: ${verdict.reason}`)
     } catch (error) {
-      // Could not verify right now. A non-200 answer makes Paystack retry later.
+      // Could not verify or deliver right now. A non-200 answer makes Paystack retry later.
       console.error(error)
-      return new Response("Verification unavailable", { status: 503 })
+      return new Response("Could not settle this payment yet", { status: 503 })
     }
   }
   // Always answer 200 to a valid event, or Paystack keeps retrying it.

@@ -14,12 +14,13 @@ Most payment tutorials trust the redirect: Paystack or Flutterwave sends the sho
 - **Server-side prices.** The browser sends a product id, never an amount. Prices live in [`lib/catalog.ts`](lib/catalog.ts), in kobo.
 - **Server-side verification.** After checkout, the app calls the provider's verify API and checks four things: the payment succeeded, the reference is ours, the currency is NGN, and the amount is at least the full price ([`lib/verify.ts`](lib/verify.ts)).
 - **Webhooks with signature checks.** Paystack webhooks are checked with HMAC SHA-512 of the raw body; Flutterwave webhooks with your secret hash. Both use constant-time comparison ([`lib/signature.ts`](lib/signature.ts)). Even a signed webhook is re-verified with the API before fulfilling.
-- **Fulfil once, even on serverless.** The redirect and the webhook can both arrive, more than once, on different server instances. With `DATABASE_URL` set, orders are recorded in Postgres with the reference as the primary key, so exactly one fulfilment wins ([`lib/orders.ts`](lib/orders.ts)).
+- **Fulfil once, even on serverless.** The redirect and the webhook can both arrive, more than once, on different server instances. With `DATABASE_URL` set, orders are claimed in Postgres with the reference as the primary key, so only one caller delivers an order at a time ([`lib/orders.ts`](lib/orders.ts)).
+- **A failed delivery is retried, not lost.** Claiming an order and recording its delivery are separate steps. If delivery throws (say the receipt email times out), the claim is released and the webhook answers 503, so the provider retries. If the server stops mid-delivery, the claim expires after 5 minutes. Until an order is marked delivered, the reconciler keeps checking it.
 - **Unsafe setups refuse to run.** Without a database, orders are kept in memory, which is fine locally and for test-mode demos. With live keys in production and no `DATABASE_URL`, the starter won't fulfil orders rather than risk fulfilling one twice.
 - **Provider outages and rate limits handled.** If the verify API is down or answers 429, that is never read as a failed payment: the shopper sees "Still confirming", and the webhook answers 503 so the provider sends the event again later.
 - **A reconciler for long outages.** Every payment is recorded as pending before the shopper pays. A scheduled job ([`lib/reconcile.ts`](lib/reconcile.ts)) re-verifies anything paid but never fulfilled, through the same `settle()` path, so an order can't be lost even if the provider stays down longer than its webhook retries. It backs off from a provider that is still down and gives up on checkouts abandoned for 3 days.
 - **No secrets in the browser.** Keys are server-only environment variables, never `NEXT_PUBLIC_`.
-- **45 tests** covering verification, rate limits, underpayment, wrong currency, forged references, webhook signatures, double fulfilment and reconciliation, including server instances racing on a real Postgres engine. No real network calls.
+- **57 tests** covering verification, rate limits, underpayment, wrong currency, forged references, webhook signatures, double fulfilment, failed and interrupted deliveries, and reconciliation, including server instances racing on a real Postgres engine. No real network calls.
 
 ## Run it in 5 minutes
 
@@ -84,7 +85,7 @@ Browser                 Your server                       Provider
 ## Going to production
 
 - **Set `DATABASE_URL`** to any Postgres database, for example Supabase (use the transaction pooler URL), Neon or Vercel Postgres. The `fulfilled_orders` and `pending_payments` tables are created on first use. This is required with live keys: without it, checkout refuses to start payments and the reason is logged.
-- **Deliver the goods where `fulfilOnce` returns true** in [`lib/orders.ts`](lib/orders.ts). That branch runs exactly once per payment.
+- **Deliver the goods in [`lib/deliver.ts`](lib/deliver.ts).** It runs after the payment is verified, normally once per order. It can run again if an earlier attempt threw or the server stopped partway, so make each step safe to repeat (for example, send the receipt with the reference as the email provider's idempotency key). Throw if delivery didn't happen, and the order is retried until it succeeds.
 - **Treat `/result` as a message, not proof.** It only displays what the server decided. Use your database as the record of what was paid.
 - **Switch to live keys** in your host's environment variables only, and set the live webhook URLs.
 - **Keep the amount check.** If you add discounts or a cart, calculate the total on the server and store it with the reference, then compare against that.

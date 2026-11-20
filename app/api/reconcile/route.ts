@@ -14,6 +14,7 @@ export async function GET(request: Request) {
   try {
     const report = await reconcile()
     if (report.fulfilled.length) console.log(`Reconciled ${report.fulfilled.length} paid order(s)`, report.fulfilled)
+    if (report.failed.length) console.error(`Delivery failed for ${report.failed.length} paid order(s)`, report.failed)
     return Response.json(report)
   } catch (error) {
     console.error(error)
